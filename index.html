@@ -41,6 +41,12 @@
   .draftbar{display:flex;align-items:center;gap:8px;margin-top:8px}
   .copybtn{padding:6px 14px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-size:12px;font-weight:600;cursor:pointer}
   .resetbtn{padding:6px 12px;border:1px solid var(--bd);border-radius:8px;background:#fff;color:var(--faint);font-size:12px;cursor:pointer}
+  .setbtn{padding:9px 16px;border:1px solid var(--bd);border-radius:9px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;margin:6px 6px 0 0}
+  .setbtn.go{background:var(--accent);color:#fff;border:none}
+  .setbtn:disabled{opacity:.5;cursor:not-allowed}
+  .krow{margin-bottom:12px} .krow label{display:block;font-size:13px;font-weight:600;margin-bottom:4px}
+  .krow input{width:100%;padding:9px 11px;border:1px solid var(--bd);border-radius:9px;font-size:13px}
+  .setlog{background:#0f1222;color:#cbd5e1;padding:12px;border-radius:10px;font-size:12px;white-space:pre-wrap;max-height:300px;overflow:auto;margin:0}
   .empty{color:#c0c4cc}
   .row2{display:flex;gap:18px;flex-wrap:wrap}.row2>*{flex:1;min-width:280px}
   #detail{position:fixed;top:0;right:0;width:420px;max-width:92vw;height:100vh;background:#fff;box-shadow:-8px 0 30px rgba(0,0,0,.14);padding:24px;overflow:auto;transform:translateX(100%);transition:.18s;z-index:1000}
@@ -63,7 +69,7 @@
     <a data-v="pipeline">🗂️ Pipeline</a>
     <a data-v="funnel">📉 KPI Funnel</a>
     <a data-v="outreach">✉️ Outreach Studio</a>
-    <a data-v="reco">🎯 Recommendation</a>
+    <a data-v="settings">⚙️ Settings</a>
   </div>
   <div class="foot">Team build — AI engine (Claude) · ICP scoring · pipeline · funnel · outreach · DSS. Data: demo (real listings); production switches to a licensed API.</div>
 </div>
@@ -72,7 +78,7 @@
   <section id="pipeline"></section>
   <section id="funnel"></section>
   <section id="outreach"></section>
-  <section id="reco"></section>
+  <section id="settings"></section>
 </div>
 <div id="detail"></div>
 <script>
@@ -210,21 +216,6 @@ function approvalUI(co){const s=state[co];
 }
 function appr(co){if(state[co]<3)state[co]++;renderOutreachRows();}
 
-function renderReco(){
-  const c=counts();
-  // data-driven provisional recommendation
-  let v,cls,why;
-  if(c.fit>=3){v="PILOT";cls="pilot";why="There are "+c.fit+" AI-qualified 'fit' leads — enough to run a focused outreach pilot and measure real response before a full Korea visit.";}
-  else if(c.fit>=1){v="PILOT";cls="pilot";why="A small number of qualified leads exist; validate with a limited outreach test first.";}
-  else {v="NO-GO (yet)";cls="nogo";why="No qualified 'fit' leads yet — keep sourcing before committing.";}
-  document.getElementById("reco").innerHTML =
-    '<h1>Recommendation (DSS)</h1><div class="sub">Go / Pilot / No-Go — provisional, from current data. Finalizes at project end with real response data.</div>'
-    +'<div class="card"><div class="sec-t">Provisional decision</div><div class="rec '+cls+'">'+v+'</div><div class="kv">'+why+'</div></div>'
-    +'<div class="row2"><div class="card"><h2>Signals we have</h2>'
-    +'<div class="kv">✅ '+c.fit+' qualified fit leads</div><div class="kv">📊 '+c.n+' companies sourced, avg fit '+c.avg+'</div><div class="kv">✉️ '+c.withM+' outreach drafts ready</div></div>'
-    +'<div class="card"><h2>Signals we still need (honesty)</h2><div class="kv">⏳ Actual outreach responses</div><div class="kv">⏳ Verification calls / meetings</div><div class="kv">⏳ Confirmed business interest</div>'
-    +'<div class="note" style="margin-top:8px">Go requires real response + meeting data — not yet available, so we don\'t claim it.</div></div></div>';
-}
 
 // detail panel
 function openLead(co){const d=DATA.find(x=>x.company===co);if(!d)return;
@@ -249,5 +240,39 @@ document.querySelectorAll(".nav a").forEach(a=>a.onclick=()=>{
   const v=a.dataset.v;document.querySelectorAll("section").forEach(s=>s.classList.remove("on"));
   document.getElementById(v).classList.add("on");closeD();
 });
-renderOverview();renderPipeline();renderFunnel();renderOutreach();renderReco();
+function keyRow(id,label,hint){
+  return '<div class="krow"><label>'+label+' <span class="empty" style="font-size:11px">'+hint+'</span></label>'
+    +'<input id="'+id+'" type="password" placeholder="•••• (saved to .env; leave blank to keep current)"></div>';
+}
+function renderSettings(){
+  document.getElementById("settings").innerHTML =
+    '<h1>⚙️ Settings — data sources</h1><div class="sub">Enter API keys, then collect. Works when opened via the internal admin server (scripts/admin_server.py, localhost); on the shared link it is view-only.</div>'
+    +'<div class="card"><h2>API keys</h2>'
+    +keyRow("ANTHROPIC_API_KEY","Anthropic (Claude)","AI qualification + outreach")
+    +keyRow("SARAMIN_API_KEY","Saramin","Job-source API — client ready")
+    +keyRow("WANTED_API_KEY","Wanted","Official API key — currently scraping; wire a client once obtained")
+    +keyRow("JOBKOREA_API_KEY","JobKorea","Wire a client once official API / partnership is obtained")
+    +keyRow("DART_API_KEY","DART (FSS)","Company-size enrichment (not a job source)")
+    +'<button class="setbtn" onclick="saveKeys()">💾 Save keys</button></div>'
+    +'<div class="card"><h2>Collect + run pipeline</h2>'
+    +'<div class="note">Pick a source → collect → ICP score → Claude qualify + outreach → rebuild platform. Today: Wanted = scraping, Saramin = API (client ready). Once official Wanted / JobKorea APIs are obtained, wire the matching source client and these buttons switch to the API.</div>'
+    +'<button class="setbtn go" onclick=\'collect("wanted")\'>▶ Wanted (now: scraping)</button>'
+    +'<button class="setbtn go" onclick=\'collect("saramin")\'>▶ Saramin (API)</button>'
+    +'<button class="setbtn go" onclick=\'collect("jobkorea")\'>▶ JobKorea (once API obtained)</button></div>'
+    +'<div class="card"><div class="sec-t">Status</div><pre id="setlog" class="setlog">idle</pre></div>';
+}
+function setStatus(t){ const el=document.getElementById("setlog"); if(el) el.textContent=t; }
+const NOBK = "⚠️ No backend on this page. Saving/collecting only works when opened via scripts/admin_server.py (localhost).";
+function saveKeys(){
+  const body=new URLSearchParams();
+  ["ANTHROPIC_API_KEY","SARAMIN_API_KEY","WANTED_API_KEY","JOBKOREA_API_KEY","DART_API_KEY"].forEach(k=>{ const el=document.getElementById(k); if(el&&el.value) body.append(k,el.value); });
+  setStatus("Saving…");
+  fetch("/save",{method:"POST",body}).then(r=>r.json()).then(d=>setStatus(d.msg||"Saved")).catch(()=>setStatus(NOBK));
+}
+function collect(src){
+  setStatus("Collecting from "+src+"… running the full pipeline (~1–2 min). The page reloads automatically when done.");
+  const body=new URLSearchParams(); body.append("source",src);
+  fetch("/run",{method:"POST",body}).then(r=>r.json()).then(d=>{ setStatus(d.log||"done"); if(d.ok) setTimeout(()=>location.reload(),1800); }).catch(()=>setStatus(NOBK));
+}
+renderOverview();renderPipeline();renderFunnel();renderOutreach();renderSettings();
 </script></body></html>
